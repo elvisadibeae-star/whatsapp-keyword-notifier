@@ -6,13 +6,15 @@ const app = express();
 app.use(express.json());
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const KEYWORDS = process.env.KEYWORDS
-  ? process.env.KEYWORDS.split(",").map((k) => k.trim().toLowerCase())
+  ? process.env.KEYWORDS.split(",").map((k) => k.trim().toLowerCase()).filter(k => k)
   : ["urgent", "help", "important"];
 
 console.log("🔍 Watching for keywords:", KEYWORDS);
 
-// ─── Webhook Verification (Meta requires this) ───────────────────────────────
+// ─── Webhook Verification ─────────────────────────────────────────────────────
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -42,14 +44,14 @@ app.post("/webhook", async (req, res) => {
     const messages = value?.messages;
 
     if (!messages || messages.length === 0) {
-      return res.sendStatus(200); // Not a message event (e.g. status update)
+      return res.sendStatus(200);
     }
 
     for (const message of messages) {
       if (message.type !== "text") continue;
 
       const text = message.text?.body || "";
-      const from = message.from; // sender's phone number
+      const from = message.from;
       const timestamp = new Date(parseInt(message.timestamp) * 1000).toLocaleString();
 
       console.log(`📩 Message from ${from}: "${text}"`);
@@ -58,7 +60,7 @@ app.post("/webhook", async (req, res) => {
       const matched = KEYWORDS.filter((kw) => text.toLowerCase().includes(kw));
 
       if (matched.length > 0) {
-        console.log(`🚨 Keyword match found: [${matched.join(", ")}] — sending email...`);
+        console.log(`🚨 Keyword match: [${matched.join(", ")}] — sending email...`);
         await sendEmailAlert({ from, text, matched, timestamp });
       }
     }
